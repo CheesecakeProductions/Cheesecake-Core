@@ -345,7 +345,10 @@ class Forums{
 */
 	public function viewforum(){
 		echo '<div class="shadowbar">';
-		global $dbc;
+		global $dbc, $core;
+		if(empty($_GET['cat'])){
+		$core->invalidAction();		
+		}
 		$secureCategory = preg_replace("/[^0-9]/", "", $_GET['cat']);
 		$cat = mysqli_real_escape_string($dbc, $secureCategory);
 		$query = "SELECT posts.*, users.* FROM posts JOIN users ON users.uid = posts.user_id AND category = '".$cat."' AND hidden = '0' ORDER BY posts.post_id DESC";
@@ -381,6 +384,9 @@ class Forums{
 	public function vpoll() {
 
 		global $dbc, $parser, $layout, $main, $settings, $core;
+		if(empty($_GET['p'])){
+		$core->invalidAction();		
+		}
 		$postid = mysqli_real_escape_string($dbc, $_GET['p']);
 		$query = "SELECT `polls`.*, `users`.* FROM `polls` JOIN `users` ON `users`.`uid` = `polls`.`user_id` AND `polls`.`postlink` = '$postid' " ;
 		$data = mysqli_query($dbc, $query) or die(mysqli_error($dbc));
@@ -416,6 +422,7 @@ class Forums{
 	}
 	public function pollvote(){
 	global $dbc, $parser, $layout, $main, $settings, $core;
+	$core->isLoggedIn();
 	$poll = mysqli_real_escape_string($dbc, $_GET['poll']);
 	$vote = mysqli_real_escape_string($dbc, $_GET['choice']);
 	$user = $_SESSION['uid'];
@@ -436,7 +443,9 @@ class Forums{
 	public function vpost() {
 		echo '<div class="shadowbar">';
 		global $dbc, $parser, $layout, $main, $settings, $core;
-		if(isset($_GET['post'])){
+		if(empty($_GET['post'])){
+		$core->invalidAction();		
+		}
 		$postid = mysqli_real_escape_string($dbc, $_GET['post']);
 		if(isset($_GET['mode']) && ($_GET['mode'] == 'lock')){
 			if($core->verify("2") || $core->verify("4")){
@@ -486,9 +495,6 @@ class Forums{
 		}
 
 		echo '</div></div></div><br />';
-	} else {
-	echo '<div class="shadowbar">Invalid Query!</div>';
-	}
 	}
 
 	public function rep() {

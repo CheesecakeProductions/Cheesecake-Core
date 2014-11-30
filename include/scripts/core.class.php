@@ -662,7 +662,9 @@ class core {
 	</form>
 	</div>';	
 	}
-
+	public function invalidAction(){
+	die('<div class="shadowbar">Invalid Argument.</div>');
+	}
 	public function sendMessageReply(){
 		global $dbc, $core;
 		$core->isLoggedIn();
