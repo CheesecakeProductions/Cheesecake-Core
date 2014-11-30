@@ -9,7 +9,7 @@ if(!defined("CCore")){
 }
 class admin {
 	private function array2php($arr){
-		$out = '<? $settings = array(';
+		$out = '<?php $settings = array(';
 		foreach( $arr as $k => $v ){
 			if( is_bool($v) ){
 				$v = ( $v ) ? 'true' : 'false';
