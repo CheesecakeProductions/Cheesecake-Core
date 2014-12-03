@@ -310,11 +310,13 @@ class core {
 	public function checkLogin(){
 		if(!isset($_SESSION['uid']) && isset($_COOKIE['ID'])){
 			global $dbc;
-			$_SESSION['uid'] = $_COOKIE['ID'];
-			$query = "SELECT username FROM users WHERE uid = '" . $_SESSION['uid'] . "'";
+			$query = "SELECT username, ip FROM users WHERE uid = '" . $_COOKIE['ID'] . "'";
 			$data = mysqli_query($dbc, $query);
-			$row = mysqli_fetch_array($data);	
+			$row = mysqli_fetch_array($data);
+			if($row['ip'] == $_COOKIE['IP']){
+			$_SESSION['uid'] = $_COOKIE['ID'];
 			$_SESSION['username'] = $row['username'];
+			}
 		}
 	}
 	public function Version($local, $remote){
@@ -419,7 +421,13 @@ class core {
 						$row = mysqli_fetch_array($data);
 						$_SESSION['uid'] = $row['uid'];
 						$_SESSION['username'] = $row['username'];
+						$_SERVER['REMOTE_ADDR'] = isset($_SERVER["HTTP_CF_CONNECTING_IP"]) ? $_SERVER["HTTP_CF_CONNECTING_IP"] : $_SERVER["REMOTE_ADDR"];
+						$ip = $_SERVER['REMOTE_ADDR'];
+						$user = $row['uid'];
+						$query = "UPDATE users SET ip = '$ip' WHERE uid = '$user' ";
+						mysqli_query($dbc, $query);
 						setcookie("ID", $row['uid'], time()+3600*24);
+						setcookie("IP", $ip, time()+3600*24);
 						echo "<div class=\"shadowbar\"><script type=\"text/javascript\">document.write(\"You will be redirected to main page in 5 seconds.\");
 				setTimeout('Redirect()', 5000);</script> if not click <a href=\"index.php\">here</a></div>";
 						exit();
