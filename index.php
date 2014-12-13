@@ -1,9 +1,6 @@
 <?php
 	error_reporting(E_ALL); ini_set('display_errors', 1);
 	define("CCore", true);
-	if(!file_exists('include/scripts/settings.php')){
-	die('<a href="installer.php">Install Board</a>');
-	}
 	session_start();
 	//Load files...
 	require_once('include/scripts/settings.php');

@@ -157,13 +157,14 @@ class admin {
 					$signup = $_POST['signup'];
 					$style = $_POST['style'];
 					$db = $settings['db'];
+					$pass = $settings['db_password'];
 					
 					$newSettings = array (         // the default settings array
 					'home_display'=>''.$home.'',
 					'style'=>''.$style.'',
 					'db_host'=>'localhost',
 					'db_user'=>'root',
-					'db_password'=>'w3nF4BrL6n4m',
+					'db_password'=>''.$pass.'',
 					'db'=>''.$db.'',
 					'login_enabled'=>true,
 					'signup_enabled'=>''.$signup.'',
@@ -173,7 +174,7 @@ class admin {
 					'board_enabled'=>false,
 					'about' => " ".$about.""
 					);
-					$end = '<?
+					$end = '<?php
 define(\'MM_UPLOADPATH\', \'include/images/profile/\');
 define(\'MM_MAXFILESIZE\', 32768);
 define(\'MM_MAXIMGWIDTH\', 120);
@@ -310,12 +311,14 @@ class core {
 	public function checkLogin(){
 		if(!isset($_SESSION['uid']) && isset($_COOKIE['ID'])){
 			global $dbc;
-			$query = "SELECT username, ip FROM users WHERE uid = '" . $_COOKIE['ID'] . "'";
+			$query = "SELECT username, ip, hash FROM users WHERE uid = '" . $_COOKIE['ID'] . "'";
 			$data = mysqli_query($dbc, $query);
 			$row = mysqli_fetch_array($data);
 			if($row['ip'] == $_COOKIE['IP']){
+			if($row['hash'] == $_COOKIE['HASH']){
 			$_SESSION['uid'] = $_COOKIE['ID'];
 			$_SESSION['username'] = $row['username'];
+			}
 			}
 		}
 	}
@@ -378,6 +381,8 @@ class core {
 		session_destroy();
 		unset($_COOKIE['ID']);
 		setcookie('ID', "", time()-86400, "/");
+		setcookie('IP', "", time()-86400, "/");
+		setcookie('HASH', "", time()-86400, "/");
 		//setcookie('user_id', "", time()-10, "/");
 		echo '
 			<script>
@@ -400,6 +405,32 @@ class core {
 		}
 		echo '</div>';
 	}
+	public function deactivateAndReset(){
+	global $dbc, $settings;
+	$user = $_SESSION['uid'];
+	$query = "UPDATE users SET activated = '0', passwordReset = '1' WHERE uid = '$user' ";
+	mysqli_query($dbc, $query);
+	echo '<div class="shadowbar">Your password has ben set the the "reset" state and your account deactivated. Once you have re-activated your account you will have to reset your password. (Check your email and be sure to check spam)</div>';
+	$query = "SELECT email, hash FROM users WHERE uid = '$user' ";
+	$data = mysqli_query($dbc, $query);
+	$row = mysqli_fetch_array($data);
+	$burl = $settings['b_url'];
+	$hash = $row['hash'];
+	$email = $row['email'];
+	$site = $settings['site_name'];
+					$to      = $email; // Send email to our user
+					$subject = $settings['site_name']; // Give the email a subject
+					$message = '	
+			You have submittd a password reset request at '.$settings['site_name'].'
+			Your account has been deactivated and you will have to reset your password upon re-activation.
+			Please click this link to activate your account:
+			http://'.$burl.'/index.php?action=verifyaccount&hash='.$hash.'
+			If you did not request this, please click here:
+			http://'.$burl.'/index.php?action=verifyaccount&hash='.$hash.'&fraud=true
+			'; // Our message above including the link				
+					$headers = 'From:'.$site.'' . "\r\n"; // Set from headers
+					mail($to, $subject, $message, $headers); // Send our email	
+	}
 	public function addNotification($U, $L, $D){
 	global $dbc;
 	$user = $U;
@@ -415,7 +446,7 @@ class core {
 				$username = mysqli_real_escape_string($dbc, trim($_POST['email']));
 				$password = mysqli_real_escape_string($dbc, trim($_POST['password']));
 				if(!empty($username) && !empty($password)){
-					$query = "SELECT uid, email, username, password FROM users WHERE email = '$username' AND password = SHA('$password') AND activated = '1'";
+					$query = "SELECT uid, email, username, password, hash FROM users WHERE email = '$username' AND password = SHA('$password') AND activated = '1'";
 					$data = mysqli_query($dbc, $query);
 					if((mysqli_num_rows($data) === 1)){
 						$row = mysqli_fetch_array($data);
@@ -428,6 +459,7 @@ class core {
 						mysqli_query($dbc, $query);
 						setcookie("ID", $row['uid'], time()+3600*24);
 						setcookie("IP", $ip, time()+3600*24);
+						setcookie("HASH", $row['hash'], time()+3600*24);
 						echo "<div class=\"shadowbar\"><script type=\"text/javascript\">document.write(\"You will be redirected to main page in 5 seconds.\");
 				setTimeout('Redirect()', 5000);</script> if not click <a href=\"index.php\">here</a></div>";
 						exit();
@@ -558,7 +590,7 @@ class core {
 			'" alt="Profile Picture" /></td></tr>';
 			echo '</table>';
 			if (!isset($_GET['uid']) || ($_SESSION['uid'] == $_GET['uid'])) {
-				echo '<p><a class="button" href="index.php?action=editprofile">Edit</a></p>';
+				echo '<p><a class="button" href="index.php?action=editprofile">Edit</a><a class="button" href="index.php?action=passwordReset">Reset Password</a></p>';
 			}
 		}
 		else {
@@ -569,14 +601,58 @@ class core {
 	}
 	public function activate() {
 		global $dbc, $parser, $layout, $main, $settings, $core; 
+		if(isset($_POST['submit'])) {
+		$password1 = mysqli_real_escape_string($dbc, trim($_POST['password1']));
+		$password2 = mysqli_real_escape_string($dbc, trim($_POST['password2']));
+		$hash = mysqli_real_escape_string($dbc, trim($_POST['hash']));
+		if($password1 == $password2){
+		$query = "UPDATE users SET `activated` = '1', `passwordReset` = '0', `password` = SHA('$password1') WHERE hash = '$hash' ";
+		$data = mysqli_query($dbc, $query);	
+		echo '<div class="shadowbar">User successfully activated! You can now login!</div>';		
+		}
+		}
+		if(isset($_GET['hash'])){
 		$secureHash = $_GET['hash'];
 		$hash = mysqli_real_escape_string($dbc, $secureHash);
 		// Grab the profile data from the database
+		$query = "SELECT passwordReset FROM users WHERE hash = '$hash' ";
+		$data = mysqli_query($dbc, $query);
+		$row = mysqli_fetch_array($data);
+		if($row['passwordReset'] == '0') {
 		$query = "UPDATE users SET `activated` = '1' WHERE hash = '$hash' ";
 		$data = mysqli_query($dbc, $query);	
 		echo '<div class="shadowbar">User successfully activated! You can now login!</div>';
 		exit();
-		
+		}
+		if($row['passwordReset'] == '1') {
+		echo '
+		<div class="shadowbar">
+				<form method="post" action="index.php?action=verifyaccount">
+				<fieldset>
+				<legend>Reset Password</legend>
+				<div class="input-group">
+				<span class="input-group-addon">Password</span>
+				<input class="form-control" type="password" id="password" name="password1" />
+				</div>
+				<div class="input-group">
+				<span class="input-group-addon">Retype Password</span>
+				<input class="form-control" type="password" id="password" name="password2" />
+				<input class="form-control" type="hidden" id="hash" name="hash" value="'.$_GET['hash'].'" />
+				</div>
+				</fieldset>
+				<input class="Link LButton" type="submit" value="Reset" name="submit" />
+			</form>
+		</div>
+		';
+		} 
+		}
+		if(isset($_GET['fraud'])){
+		if($_GET['fraud'] == 'true') {
+		$query = "UPDATE users SET `activated` = '1', `passwordReset` = '0' WHERE hash = '$hash' ";
+		$data = mysqli_query($dbc, $query);	
+		echo '<div class="shadowbar">User successfully activated! You can now login!</div>';		
+		}
+		}
 		
 	}
 	public function viewConvo(){
